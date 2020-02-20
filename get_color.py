@@ -5,10 +5,17 @@ import numpy as np
 import requests
 
 BLOCK_SIZE = 8192
+COLOR_REF = {
+    'teal': [0, 128, 128],
+    'red': [255, 0, 0],
+    'black': [0, 0, 0],
+    'navy': [0, 0, 128]
+}
 
 
-# this simple http server script is referenced of the internet
-# it's not very important so I'm not gonna comment every line of what it does
+# some of this simple http server script is referenced of the internet
+# not going to comment every line, but the logic is to run a local server on port using socket
+# we are extracting image url from head
 def serve(host='0.0.0.0', port=3246):
     try:
         # socket listening on specified port
@@ -19,9 +26,9 @@ def serve(host='0.0.0.0', port=3246):
 
         print('Echoing from http://{}:{}'.format(host, port))
 
+        # open connection
         while True:
             connection, client_address = sock.accept()
-
             request = {}
             bytes_left = BLOCK_SIZE
             while bytes_left > 0:
@@ -53,7 +60,7 @@ def serve(host='0.0.0.0', port=3246):
             # since this is a test we assume all urls are valid and we don't check them
             if len(request['header']['request-line']) != 0:
                 url_to_parse = request['header']['request-line'].split(' ')[1][1:]
-
+                # ignoring the required website icon
                 if url_to_parse != 'favicon.ico':
 
                     resp = requests.get(url_to_parse, stream=True).raw
@@ -61,13 +68,7 @@ def serve(host='0.0.0.0', port=3246):
                     image = cv2.imdecode(image, cv2.IMREAD_COLOR)
                     b, g, r = cv2.split(image)
 
-                    COLOR_REF = {
-                        'teal': [0, 128, 128],
-                        'red': [255, 0, 0],
-                        'black': [0, 0, 0],
-                        'navy': [0, 0, 128]
-                    }
-
+                    '''
                     # for images that contains complex patterns I'd rather first compute a histogram of the color distribution
                     # then just compare the most frequent pixel value to the color_reference values we are checking for
                     # this approach is better than computing the average absolute difference between each pixels and the target colors
@@ -98,7 +99,7 @@ def serve(host='0.0.0.0', port=3246):
                     #
                     # print(diff_dict)
                     # print(min(diff_dict.keys(), key=lambda x: diff_dict[x]))
-
+                    '''
                     b = np.array(b).mean()
                     g = np.array(g).mean()
                     r = np.array(r).mean()
@@ -130,19 +131,20 @@ def serve(host='0.0.0.0', port=3246):
 
 
 def build_request(first_chunk):
+    """ Build our request here"""
     lines = first_chunk.decode('utf-8', 'ignore').split('\r\n')
-    h = {'request-line': lines[0]}
+    header = {'request-line': lines[0]}
     i = 1
     while i < len(lines[1:]) and lines[i] != '':
         k, v = lines[i].split(': ')
-        h.update({k.lower(): v})
+        header.update({k.lower(): v})
         i += 1
-    r = {
-        "header": h,
+    request = {
+        "header": header,
         "raw": first_chunk,
         "body": lines[-1]
     }
-    return r
+    return request
 
 
 # serve(host='0.0.0.0', port=3246)
